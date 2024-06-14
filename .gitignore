@@ -5,3 +5,4 @@
 *.json
 *.safetensors
 *.*.model
+lingvanex_api_key.txt
