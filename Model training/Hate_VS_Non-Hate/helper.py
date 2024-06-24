@@ -204,6 +204,10 @@ def eval_model(model, data_loader, device):
 def train_model(train_data_loader, val_data_loader, model, optimizer, device, epochs, tokenizer, path, start_epoch=0):
     history, last_epoch = load_training_history(os.path.join(path, 'training_log.csv'))
 
+    best_val_acc = 0.0 
+    early_stopping_patience = 5 
+    no_improvement_epochs = 0 
+
     if start_epoch == 0:
         start_epoch = last_epoch + 1
 
@@ -222,11 +226,22 @@ def train_model(train_data_loader, val_data_loader, model, optimizer, device, ep
         history['val_acc'].append(val_acc)
         history['val_loss'].append(val_loss)
 
-        save_model(model, tokenizer, path, epoch)
-        log_metrics_to_csv(path, epoch, train_acc, train_loss, val_acc, val_loss)
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            save_model(model, tokenizer, path, epoch)  
+            print(f"Checkpoint saved: Improved validation accuracy at epoch {epoch}: {val_acc}")
+            no_improvement_epochs = 0
+        else:
+            no_improvement_epochs += 1
+            print(f"No improvement in validation accuracy for {no_improvement_epochs} epochs.")
 
+        if no_improvement_epochs >= early_stopping_patience:
+            print("Stopping early due to lack of improvement in validation accuracy.")
+            break
+
+        log_metrics_to_csv(path, epoch, train_acc, train_loss, val_acc, val_loss)
     return history
-### Model Training ###
+### End of Model Training ###
 
 ### Model prediction ###
 def predict(texts, model, tokenizer, max_len, device):
