@@ -99,6 +99,11 @@ def preprocess_text(text, language='english'):
     filtered_words = [word for word in words if word not in stop_words]
     text = ' '.join(filtered_words)
     return text.strip()
+
+def shuffle_data(texts, labels):
+    indices = np.arange(len(texts))
+    np.random.shuffle(indices)
+    return [texts[i] for i in indices], [labels[i] for i in indices]
 ### End of Data Preprocessing and Exploration ###
 
 ### Model Loading and Saving ###
