@@ -11,7 +11,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from torch.utils.data import DataLoader, Dataset
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, f1_score, precision_score, recall_score
 
 nltk.download('stopwords')
 
@@ -49,7 +49,7 @@ class TextDataset(Dataset):
             'text': text,
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
-            'label': torch.tensor(label, dtype=torch.long)
+            'label': torch.tensor(label, dtype=torch.float)
         }
 
 def create_data_loader(texts, labels, tokenizer, max_len, batch_size):
@@ -248,6 +248,117 @@ def train_model(train_data_loader, val_data_loader, model, optimizer, device, ep
     return history
 ### End of Model Training ###
 
+#### train multi model training ###
+def train_epoch_multi(model, data_loader, optimizer, device):
+    model.train()
+    losses = []
+    correct_predictions = 0
+    total_samples = 0
+    
+    progress_bar = tqdm(data_loader, desc="Training Progress", total=len(data_loader))
+    for d in progress_bar:
+        input_ids = d["input_ids"].to(device)
+        attention_mask = d["attention_mask"].to(device)
+        labels = d["label"].to(device)  
+
+        optimizer.zero_grad()
+        outputs = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=labels
+        )
+        loss = outputs.loss
+        logits = outputs.logits
+        preds = (logits.sigmoid() > 0.5).int()  
+        
+        loss.backward()
+        optimizer.step()
+
+        correct_predictions += (preds == labels).all(dim=1).sum().item()
+        total_samples += labels.size(0)
+        losses.append(loss.item())
+
+        progress_bar.set_postfix({'loss': loss.item()})
+
+    train_accuracy = correct_predictions / total_samples
+    average_loss = np.mean(losses)
+    return train_accuracy, average_loss
+
+
+def train_model_multi(train_data_loader, val_data_loader, model, optimizer, device, epochs, tokenizer, path, start_epoch=0):
+    history = {'train_acc': [], 'train_loss': [], 'val_acc': [], 'val_loss': []}
+    last_epoch = start_epoch
+    
+    best_val_acc = 0.0
+    early_stopping_patience = 5
+    no_improvement_epochs = 0
+
+    for epoch in range(start_epoch, epochs + 1):
+        print(f'Epoch {epoch}/{epochs}')
+        print('-' * 10)
+
+        train_acc, train_loss = train_epoch_multi(model, train_data_loader, optimizer, device)
+        print(f'Train loss {train_loss} accuracy {train_acc}')
+
+        val_acc, val_loss, _, _ = eval_model_multi(model, val_data_loader, device)  
+        print(f'Validation loss {val_loss} accuracy {val_acc}')
+
+        history['train_acc'].append(train_acc)
+        history['train_loss'].append(train_loss)
+        history['val_acc'].append(val_acc)
+        history['val_loss'].append(val_loss)
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            save_model(model, tokenizer, path, epoch)  
+            print(f"Checkpoint saved: Improved validation accuracy at epoch {epoch}: {val_acc}")
+            no_improvement_epochs = 0
+        else:
+            no_improvement_epochs += 1
+            print(f"No improvement in validation accuracy for {no_improvement_epochs} epochs.")
+
+        if no_improvement_epochs >= early_stopping_patience:
+            print("Stopping early due to lack of improvement in validation accuracy.")
+            break
+
+    return history
+
+def eval_model_multi(model, data_loader, device):
+    model.eval()
+    losses = []
+    correct_predictions = 0
+    total_samples = 0
+
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for d in data_loader:
+            input_ids = d["input_ids"].to(device)
+            attention_mask = d["attention_mask"].to(device)
+            labels = d["label"].to(device)  
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels
+            )
+            loss = outputs.loss
+            logits = outputs.logits
+            preds = (logits.sigmoid() > 0.5).int()  
+
+            losses.append(loss.item())
+            correct_predictions += (preds == labels).all(dim=1).sum().item()
+            total_samples += labels.size(0)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    validation_accuracy = correct_predictions / total_samples
+    average_loss = np.mean(losses)
+    return validation_accuracy, average_loss, all_preds, all_labels
+### End of Model Evaluation ###
+
 ### Model prediction ###
 def predict(texts, model, tokenizer, max_len, device):
     model = model.eval()
@@ -294,16 +405,32 @@ def plot_history(history):
     plt.show()
 
 def plot_confusion_matrix(y_true, y_pred, labels):
+    print("Accuracy:", round(accuracy_score(y_true, y_pred),2))
+    print("F1 Score:", round(f1_score(y_true, y_pred, average='weighted'),2))
+    print("Precision:", round(precision_score(y_true, y_pred, average='weighted'),2))
+    print("Recall:", round(recall_score(y_true, y_pred, average='weighted'),2))
+    print()
     print("Classification Report:")
     report = classification_report(y_true, y_pred, target_names=labels)
     print(report)
 
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=['Not Hate', 'Hate'],
-                yticklabels=['Not Hate', 'Hate'])
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title('Confusion Matrix')
-    plt.show()
+    if len(labels) == 2:
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=labels,
+                    yticklabels=labels)
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.title('Confusion Matrix')
+        plt.show()
+    else:
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=labels,
+                    yticklabels=labels)
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.title('Confusion Matrix')
+        plt.show()
