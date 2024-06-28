@@ -29,6 +29,11 @@ class TextDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_len = max_len
 
+        if self.labels.shape == (self.labels.shape[0], ):
+            self.type = 'binary'
+        else:
+            self.type = 'multi'
+
     def __len__(self):
         return len(self.texts)
 
@@ -45,11 +50,16 @@ class TextDataset(Dataset):
             return_attention_mask=True,
             return_tensors='pt',
         )
+
+        if self.type == 'binary':
+            temp_type = torch.tensor(label, dtype=torch.long)
+        else:
+            temp_type = torch.tensor(label, dtype=torch.float)
         return {
             'text': text,
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
-            'label': torch.tensor(label, dtype=torch.float)
+            'label': temp_type
         }
 
 def create_data_loader(texts, labels, tokenizer, max_len, batch_size):
@@ -406,9 +416,9 @@ def plot_history(history):
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     print("Accuracy:", round(accuracy_score(y_true, y_pred),2))
-    print("F1 Score:", round(f1_score(y_true, y_pred, average='weighted'),2))
-    print("Precision:", round(precision_score(y_true, y_pred, average='weighted'),2))
-    print("Recall:", round(recall_score(y_true, y_pred, average='weighted'),2))
+    print("F1 Score:", round(f1_score(y_true, y_pred),2))
+    print("Precision:", round(precision_score(y_true, y_pred),2))
+    print("Recall:", round(recall_score(y_true, y_pred),2))
     print()
     print("Classification Report:")
     report = classification_report(y_true, y_pred, target_names=labels)
