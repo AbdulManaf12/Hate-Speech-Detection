@@ -416,9 +416,9 @@ def plot_history(history):
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     print("Accuracy:", round(accuracy_score(y_true, y_pred),2))
-    print("F1 Score:", round(f1_score(y_true, y_pred),2))
-    print("Precision:", round(precision_score(y_true, y_pred),2))
-    print("Recall:", round(recall_score(y_true, y_pred),2))
+    print("F1 Score:", round(f1_score(y_true, y_pred, average='weighted'), 2))
+    print("Precision:", round(precision_score(y_true, y_pred, average='weighted'), 2))
+    print("Recall:", round(recall_score(y_true, y_pred, average='weighted'), 2))
     print()
     print("Classification Report:")
     report = classification_report(y_true, y_pred, target_names=labels)
