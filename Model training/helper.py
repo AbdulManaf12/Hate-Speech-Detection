@@ -21,6 +21,12 @@ with open('../resources/stopwords-ur.txt', 'r', encoding='utf-8') as f:
 with open('../resources/stopwords-sd.txt', 'r', encoding='utf-8') as f:
     sindhi_stopwords = set(f.read().splitlines())
 
+# with open('/content/drive/MyDrive/Hate Speech_Multilingual /Code/Model training/Hate_VS_Non-Hate/resources/stopwords-ur.txt', 'r', encoding='utf-8') as f:
+#     urdu_stopwords = set(f.read().splitlines())
+    
+# with open('/content/drive/MyDrive/Hate Speech_Multilingual /Code/Model training/Hate_VS_Non-Hate/resources/stopwords-sd.txt', 'r', encoding='utf-8') as f:
+#     sindhi_stopwords = set(f.read().splitlines())
+
 ### Data Preprocessing and Exploration ###
 class TextDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_len):
