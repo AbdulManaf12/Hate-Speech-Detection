@@ -443,10 +443,15 @@ def plot_confusion_matrix(y_true, y_pred, labels):
     else:
         cm = confusion_matrix(y_true, y_pred)
         plt.figure(figsize=(12, 10))
+        plt.rcParams.update({'font.size': 14})
+
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
                     xticklabels=labels,
-                    yticklabels=labels)
-        plt.xlabel('Predicted')
-        plt.ylabel('Actual')
-        plt.title('Confusion Matrix')
+                    yticklabels=labels,
+                    annot_kws={"size": 16}) 
+
+        plt.xlabel('Predicted', fontsize=18) 
+        plt.ylabel('Actual', fontsize=18)    
+        plt.title('Confusion Matrix', fontsize=20) 
+
         plt.show()
